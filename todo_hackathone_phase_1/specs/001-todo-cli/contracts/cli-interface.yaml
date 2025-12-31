@@ -1,0 +1,154 @@
+# CLI Interface Contract
+
+**Date**: 2025-12-31
+**Feature**: 001-todo-cli
+
+## Menu Display Format
+
+```
+=== Todo Console App ===
+1. Add Task
+2. View Tasks
+3. Update Task
+4. Delete Task
+5. Toggle Completion
+6. Exit
+
+Enter your choice (1-6):
+```
+
+## Operations
+
+### Operation 1: Add Task
+
+**Input**:
+```
+Enter task title: <string>
+Enter task description (optional): <string or empty>
+```
+
+**Output (Success)**:
+```
+Task added successfully! ID: 1
+```
+
+**Output (Error)**:
+```
+Error: Title cannot be empty.
+```
+
+---
+
+### Operation 2: View Tasks
+
+**Input**: None (after selecting option 2)
+
+**Output (Empty)**:
+```
+No tasks found. Add a task to get started!
+```
+
+**Output (With Tasks)**:
+```
+ID | Status    | Title
+---+-----------+-------------------------
+1  | [Pending] | Buy groceries
+2  | [Done]    | Call mom
+```
+
+---
+
+### Operation 3: Update Task
+
+**Input**:
+```
+Enter task ID to update: <integer>
+Enter new title: <string>
+Enter new description (optional): <string or empty>
+```
+
+**Output (Success)**:
+```
+Task 1 updated successfully.
+```
+
+**Output (Error - Not Found)**:
+```
+Error: Task 99 not found.
+```
+
+**Output (Error - Empty Title)**:
+```
+Error: Title cannot be empty.
+```
+
+---
+
+### Operation 4: Delete Task
+
+**Input**:
+```
+Enter task ID to delete: <integer>
+```
+
+**Output (Success)**:
+```
+Task 1 deleted successfully.
+```
+
+**Output (Error)**:
+```
+Error: Task 99 not found.
+```
+
+---
+
+### Operation 5: Toggle Completion
+
+**Input**:
+```
+Enter task ID to toggle: <integer>
+```
+
+**Output (Success - Mark Complete)**:
+```
+Task 1 marked as completed.
+```
+
+**Output (Success - Mark Incomplete)**:
+```
+Task 1 marked as pending.
+```
+
+**Output (Error)**:
+```
+Error: Task 99 not found.
+```
+
+---
+
+### Operation 6: Exit
+
+**Input**: None (after selecting option 6)
+
+**Output**:
+```
+Goodbye! Thanks for using Todo Console App.
+```
+
+## Error Handling
+
+| Error Type | Input | Behavior |
+|------------|-------|----------|
+| Invalid menu choice | "abc" or "7" | "Invalid choice. Please enter a number 1-6." |
+| Non-integer ID | "abc" | "Invalid ID. Please enter a number." |
+| Empty title | "" | "Title cannot be empty." |
+| Task not found | ID 999 | "Task 999 not found." |
+
+## Session Lifecycle
+
+```
+Start -> Menu -> [Operation] -> Result -> Menu -> ... -> Exit -> Program End
+```
+
+All data is stored in-memory and lost on program exit.
