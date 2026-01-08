@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+__pycache__/
+.venv/
+env/
+*.pyc
+
+# Next.js
+.next/
+out/
+.next/output/
+
+# Environment variables
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env
+
+# Python
+.pytest_cache/
+
+# General
+.DS_Store
+dist/
+build/
+*.log
+coverage/
+.nyc_output/
