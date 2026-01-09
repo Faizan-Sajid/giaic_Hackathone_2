@@ -265,8 +265,8 @@ async def login(
         key="token",
         value=token,
         httponly=True,  # Prevents JavaScript access (XSS protection)
-        secure=False,  # HTTP only (local development) - set to True in production
-        samesite="lax",  # Lax CSRF protection for cross-origin compatibility
+        secure=True,  # HTTP only (local development) - set to True in production
+        samesite="none",  # Lax CSRF protection for cross-origin compatibility
         max_age=604800,  # 7 days in seconds (7 * 24 * 60 * 60)
         path="/",  # Valid for entire domain
         domain=None  # Explicitly set domain to None
