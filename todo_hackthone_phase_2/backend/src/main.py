@@ -43,7 +43,7 @@ app = FastAPI(
 # Explicitly configure for frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # ONLY allow this origin
+    allow_origins=["https://giaic-hackathone-2.vercel.app"],  # ONLY allow this origin
     allow_credentials=True,  # Required for cookies - set BEFORE other middleware
     allow_methods=["*"],
     allow_headers=["*"],
