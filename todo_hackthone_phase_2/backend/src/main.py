@@ -28,6 +28,7 @@ from sqlmodel import SQLModel
 # Import routers
 from .api.routes import auth as auth, tasks as tasks, health as health
 from .api.chat import router as chat
+from .api.debug import router as debug
 
 
 # FastAPI application instance
@@ -110,6 +111,7 @@ async def shutdown_event():
 app.include_router(auth.router, prefix="/api", tags=["Authentication"])
 app.include_router(tasks.router, prefix="/api", tags=["Tasks"])
 app.include_router(chat, prefix="/api", tags=["Chat"])
+app.include_router(debug, prefix="/api", tags=["Debug"])
 app.include_router(health.router, tags=["Health Check"])
 
 

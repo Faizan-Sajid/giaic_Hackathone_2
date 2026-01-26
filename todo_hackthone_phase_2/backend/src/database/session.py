@@ -15,168 +15,80 @@ load_dotenv()
 # Database URL from environment variable
 DATABASE_URL = os.getenv("DATABASE_URL")
 
+print("=" * 80)
+print("DATABASE INITIALIZATION DEBUG")
+print("=" * 80)
+print(f"DATABASE_URL from env: {DATABASE_URL}")
+
+# CRITICAL FIX: Use ONLY PostgreSQL, no fallback to SQLite
+if not DATABASE_URL or "postgresql" not in DATABASE_URL:
+    raise ValueError(
+        "XXX CRITICAL: DATABASE_URL must be set to a PostgreSQL connection string!\n"
+        f"Found: {DATABASE_URL}\n"
+        "Expected format: postgresql+asyncpg://user:pass@host/dbname"
+    )
+
+# Clean connection strings for specific drivers
+# For Async (asyncpg) - asyncpg uses ssl=require in URL, not sslmode
+ASYNC_DB_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://").replace("sslmode=require", "ssl=require")
+
+# For Sync (psycopg2) - sync engine uses psycopg2 which expects sslmode=require
+SYNC_DB_URL = DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://")
+if "ssl=" in SYNC_DB_URL and "sslmode=" not in SYNC_DB_URL:
+    # Convert ssl= to sslmode= for psycopg2
+    SYNC_DB_URL = SYNC_DB_URL.replace("ssl=require", "sslmode=require").replace("ssl=true", "sslmode=require")
+
+# Ensure both URLs have proper SSL configuration for Neon
+if "ssl=require" not in ASYNC_DB_URL and "sslmode=require" not in ASYNC_DB_URL:
+    # Add ssl=require to async URL (for asyncpg)
+    if "?" in ASYNC_DB_URL:
+        ASYNC_DB_URL = f"{ASYNC_DB_URL}&ssl=require"
+    else:
+        ASYNC_DB_URL = f"{ASYNC_DB_URL}?ssl=require"
+
+if "sslmode=require" not in SYNC_DB_URL and "ssl=require" not in SYNC_DB_URL:
+    # Add sslmode=require to sync URL
+    if "?" in SYNC_DB_URL:
+        SYNC_DB_URL = f"{SYNC_DB_URL}&sslmode=require"
+    else:
+        SYNC_DB_URL = f"{SYNC_DB_URL}?sslmode=require"
+
 # Connection pool configuration
 # pool_size=10: Maintain 10 connections in pool
 # max_overflow=10: Allow 10 additional connections when pool exhausted
 # pool_pre_ping=True: Verify connections before using
 # pool_recycle=3600: Recycle connections after 1 hour (prevent connection rot)
 
-# Async engine for FastAPI - with fallback for SSL/connection issues
-import re
+# Create PostgreSQL async engine (for async operations) - NO FALLBACK!
+# asyncpg handles SSL via URL parameters, not connect_args
+async_engine = create_async_engine(
+    ASYNC_DB_URL,
+    echo=True,  # Keep this to see SQL queries
+    pool_size=int(os.getenv("DB_POOL_SIZE", "10")),
+    max_overflow=int(os.getenv("DB_MAX_OVERFLOW", "10")),
+    pool_pre_ping=True,
+    pool_recycle=3600,
+)
 
-# Process the DATABASE_URL for async compatibility
-async_database_url = DATABASE_URL
-if DATABASE_URL.startswith("postgresql://"):
-    # Handle SSL parameter issues in PostgreSQL URLs
-    # Remove problematic ssl parameters or convert them
-    if "?ssl=require" in DATABASE_URL or "&ssl=require" in DATABASE_URL:
-        # Replace with proper asyncpg SSL handling
-        async_database_url = DATABASE_URL.replace("?ssl=require", "?sslmode=require").replace("&ssl=require", "&sslmode=require")
-    elif "?ssl=true" in DATABASE_URL or "&ssl=true" in DATABASE_URL:
-        async_database_url = DATABASE_URL.replace("?ssl=true", "?sslmode=require").replace("&ssl=true", "&sslmode=require")
+print(f"XXX Async Engine Created: {async_engine.url}")
+print(f"   Engine Type: PostgreSQL (asyncpg)")
+print(f"   This will be used for: Chatbot tools, Async operations")
 
-try:
-    # Determine if we need SQLite-specific connect_args
-    if "sqlite" in async_database_url.lower():
-        connect_args = {"check_same_thread": False}  # Required for SQLite
-    else:
-        connect_args = {}  # PostgreSQL doesn't need this
+# Create PostgreSQL sync engine (for sync operations like MCP tools) - NO FALLBACK!
+# psycopg2 handles SSL via sslmode parameter
+sync_engine = create_engine(
+    SYNC_DB_URL,
+    echo=True,
+    pool_size=int(os.getenv("DB_POOL_SIZE", "10")),
+    max_overflow=int(os.getenv("DB_MAX_OVERFLOW", "10")),
+    pool_pre_ping=True,
+    pool_recycle=3600,
+)
 
-    async_engine = create_async_engine(
-        async_database_url,
-        echo=True,  # Enable SQL logging for debugging
-        pool_size=int(os.getenv("DB_POOL_SIZE", "10")),
-        max_overflow=int(os.getenv("DB_MAX_OVERFLOW", "10")),
-        pool_pre_ping=True,
-        pool_recycle=3600,
-        connect_args=connect_args
-    )
-
-    # Test the async engine immediately to catch SSL or other connection issues early
-    # Don't use asyncio.run() from module level when running inside an event loop
-    import asyncio
-    from sqlalchemy.ext.asyncio import create_async_engine as temp_create_async_engine
-
-    async def test_async_engine():
-        # Determine if we need SQLite-specific connect_args
-        if "sqlite" in async_database_url.lower():
-            connect_args = {"check_same_thread": False}  # Required for SQLite
-        else:
-            connect_args = {}  # PostgreSQL doesn't need this
-
-        temp_engine = create_async_engine(
-            async_database_url,
-            echo=True,
-            pool_size=int(os.getenv("DB_POOL_SIZE", "10")),
-            max_overflow=int(os.getenv("DB_MAX_OVERFLOW", "10")),
-            pool_pre_ping=True,
-            pool_recycle=3600,
-            connect_args=connect_args
-        )
-        async with temp_engine.connect() as conn:
-            pass  # Just test if we can connect
-        await temp_engine.dispose()
-
-    # Check if we're already in an event loop (e.g., when running in Jupyter or FastAPI)
-    try:
-        loop = asyncio.get_running_loop()
-        # We're in an event loop, so we can't use asyncio.run()
-        # Instead, we'll test the connection later during initialization
-        print("Note: Running inside an event loop, deferring async engine test")
-    except RuntimeError:
-        # No event loop running, safe to use asyncio.run()
-        asyncio.run(test_async_engine())
-
-except Exception as e:
-    print(f"Warning: Could not create async engine with URL {async_database_url}: {e}")
-    print(f"Falling back to file-based SQLite async engine at: {SQLITE_FILE}")
-
-    # Use the file-based SQLite async engine
-    async_engine = create_async_engine(
-        SQLITE_ASYNC_URL,
-        echo=True,  # Enable SQL logging for debugging
-        pool_pre_ping=True,
-        pool_recycle=3600,
-        connect_args={"check_same_thread": False}  # Required for SQLite
-    )
-
-# Sync engine for synchronous operations (like MCP tools)
-# Handle different database URL schemes appropriately and use available drivers
-db_url_for_sync = DATABASE_URL
-if DATABASE_URL.startswith("postgresql+asyncpg://"):
-    # Convert asyncpg URL to regular postgresql URL, try psycopg2 then pg8000
-    db_url_for_sync = DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://", 1)
-elif DATABASE_URL.startswith("sqlite+aiosqlite://"):
-    # Convert aiosqlite URL to regular sqlite URL
-    db_url_for_sync = DATABASE_URL.replace("sqlite+aiosqlite://", "sqlite://", 1)
-
-# Import models early to ensure they're registered with SQLModel
-from sqlmodel import SQLModel
-from . import Conversation, Message  # Import the conversation/message models
-from ..models import user, task     # Import the user/task models
-
-import os
-from pathlib import Path
-from sqlalchemy import text
-
-# Create a data directory for SQLite database
-BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent  # Go to project root
-DATA_DIR = BASE_DIR / "data"
-DATA_DIR.mkdir(exist_ok=True)
-
-# Use file-based SQLite instead of in-memory
-SQLITE_FILE = DATA_DIR / "todo_app.db"
-SQLITE_URL = f"sqlite:///{SQLITE_FILE}"
-SQLITE_ASYNC_URL = f"sqlite+aiosqlite:///{SQLITE_FILE}"
-
-print(f"DEBUG: Using SQLite database at: {SQLITE_FILE}")
-
-# Try to create sync engine with fallback drivers if needed
-try:
-    # Determine if we need SQLite-specific connect_args
-    if "sqlite" in db_url_for_sync.lower():
-        connect_args = {"check_same_thread": False}  # Required for SQLite
-    else:
-        connect_args = {}  # PostgreSQL doesn't need this
-
-    # First, let's try to create the sync engine with the processed URL
-    sync_engine = create_engine(
-        db_url_for_sync,
-        echo=True,  # Enable SQL logging for debugging
-        pool_size=int(os.getenv("DB_POOL_SIZE", "10")),
-        max_overflow=int(os.getenv("DB_MAX_OVERFLOW", "10")),
-        pool_pre_ping=True,
-        pool_recycle=3600,
-        connect_args=connect_args
-    )
-
-    # Test the connection to see if it actually works
-    with sync_engine.connect() as conn:
-        pass  # Just test if we can connect
-
-    # Create tables for the sync engine
-    print("DEBUG: Creating tables for sync engine (primary)")
-    SQLModel.metadata.create_all(sync_engine)
-
-except Exception as e:
-    # If there's an issue with the primary database driver, try with file-based SQLite for testing
-    print(f"Warning: Could not create sync engine with URL {db_url_for_sync}: {e}")
-    print(f"Falling back to file-based SQLite at: {SQLITE_FILE}")
-
-    sync_engine = create_engine(
-        SQLITE_URL,
-        echo=True,  # Enable SQL logging for debugging
-        pool_pre_ping=True,
-        pool_recycle=3600,
-        connect_args={"check_same_thread": False}  # Required for SQLite
-    )
-
-    # Create the tables in the file-based SQLite database
-    # Models are already imported above
-
-    # Ensure the models are registered with SQLModel before creating tables
-    SQLModel.metadata.create_all(sync_engine)
-    print("DEBUG: Tables created for fallback file-based sync engine")
+print(f"XXX Sync Engine Created: {sync_engine.url}")
+print(f"   Engine Type: PostgreSQL (psycopg2/other)")
+print(f"   This will be used for: MCP tools, Sync operations")
+print("=" * 80)
 
 # Async session factory for FastAPI dependency injection
 async_session = async_sessionmaker(
@@ -197,9 +109,18 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
     Spec: NFR-001 (stateless services)
     Provides async session to FastAPI routes
     Session is automatically closed after request
+
+    CRITICAL: This function is used by async operations!
+    It MUST return a session connected to PostgreSQL (Neon)!
     """
     async with async_session() as session:
+        # Debug: Log which database we're connected to
+        db_name = async_engine.url.database
+        db_host = async_engine.url.host
+        print(f"[CONNECTION] Async Session created: Connected to {db_host}/{db_name} (PostgreSQL)")
+
         yield session
+        print(f"[CONNECTION] Async Session closed: {db_host}/{db_name}")
 
 
 def get_session_sync() -> Generator[Session, None, None]:
@@ -207,14 +128,23 @@ def get_session_sync() -> Generator[Session, None, None]:
     Synchronous database session generator for synchronous operations
     Like MCP tools that need to run synchronously for OpenAI Agents SDK
 
+    CRITICAL: This function is used by MCP tool handlers!
+    It MUST return a session connected to PostgreSQL (Neon)!
+
     Yields:
         SQLModel Session for synchronous database operations
     """
+    # Debug: Log which database we're connected to
+    db_name = sync_engine.url.database
+    db_host = sync_engine.url.host
+    print(f"[CONNECTION] Sync Session created: Connected to {db_host}/{db_name} (PostgreSQL)")
+
     session = Session(sync_engine)
     try:
         yield session
     finally:
         session.close()
+        print(f"[CONNECTION] Sync Session closed: {db_host}/{db_name}")
 
 
 async def init_db():
@@ -225,84 +155,26 @@ async def init_db():
     Spec: DINT-001-DINT-007 (data integrity constraints)
     Creates all SQLModel tables on startup
     """
-    print("DEBUG: Starting database initialization...")
+    print("\n" + "=" * 80)
+    print("CREATING DATABASE TABLES")
+    print("=" * 80)
 
-    # Import models to ensure they're registered with SQLModel first
-    from . import Conversation, Message
-    from ..models import user, task  # Import user and task models too
+    # Import all models to register them
+    from .models import Conversation, Message
+    from ..models.user import User
+    from ..models.task import Task
 
-    print(f"DEBUG: Available models in metadata: {list(SQLModel.metadata.tables.keys())}")
+    print("Imported models:", [Conversation.__tablename__, Message.__tablename__,
+                               User.__tablename__, Task.__tablename__])
 
-    # Test the async engine connection during initialization
-    try:
-        from sqlalchemy.ext.asyncio import create_async_engine as temp_create_async_engine
-        import os
-
-        # Get the database URL again to test
-        DATABASE_URL = os.getenv("DATABASE_URL")
-        async_database_url = DATABASE_URL
-        if DATABASE_URL.startswith("postgresql://"):
-            if "?ssl=require" in DATABASE_URL or "&ssl=require" in DATABASE_URL:
-                async_database_url = DATABASE_URL.replace("?ssl=require", "?sslmode=require").replace("&ssl=require", "&sslmode=require")
-            elif "?ssl=true" in DATABASE_URL or "&ssl=true" in DATABASE_URL:
-                async_database_url = DATABASE_URL.replace("?ssl=true", "?sslmode=require").replace("&ssl=true", "&sslmode=require")
-
-        # Test connection with the async engine
-        async with async_engine.connect() as conn:
-            # This will raise an exception if there are connection issues
-            await conn.commit()  # Simple test transaction
-        print("DEBUG: Async engine connection test passed")
-    except Exception as e:
-        print(f"Warning: Could not connect to async engine with URL {async_database_url}: {e}")
-        print(f"Using fallback file-based SQLite async engine at: {SQLITE_FILE}")
-
-        # Update the global variable to use the file-based SQLite engine
-        globals()['async_engine'] = create_async_engine(
-            SQLITE_ASYNC_URL,
-            echo=True,
-            pool_pre_ping=True,
-            pool_recycle=3600,
-            connect_args={"check_same_thread": False}  # Required for SQLite
-        )
-
-    # Create tables for the async engine
-    print("DEBUG: Creating tables for async engine...")
+    # Create tables using async engine (PostgreSQL)
+    print(f"Creating tables in: {async_engine.url}")
     async with async_engine.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
 
-    # Verify tables were created in the database
-    async with async_engine.connect() as conn:
-        if "sqlite" in str(async_engine.url):
-            # For SQLite, check tables
-            result = await conn.run_sync(
-                lambda sync_conn: sync_conn.execute(
-                    text("SELECT name FROM sqlite_master WHERE type='table'")
-                ).fetchall()
-            )
-            table_names = [row[0] for row in result]
-            print(f"DEBUG: Tables in async database: {table_names}")
+    # Also create tables in sync engine (should be the same PostgreSQL)
+    print(f"Ensuring tables in sync engine: {sync_engine.url}")
+    SQLModel.metadata.create_all(sync_engine)
 
-    print(f"DEBUG: Async engine tables created successfully: {list(SQLModel.metadata.tables.keys())}")
-
-    # Also ensure sync engine tables are created if it's different from async engine
-    # (This handles the fallback case where sync engine might be different)
-    print("DEBUG: Creating tables for sync engine...")
-    global sync_engine
-    if sync_engine is not None:
-        SQLModel.metadata.create_all(sync_engine)
-
-        # Verify tables were created in sync engine too
-        if "sqlite" in str(sync_engine.url):
-            # For SQLite, check tables
-            with sync_engine.connect() as conn:
-                result = conn.execute(
-                    text("SELECT name FROM sqlite_master WHERE type='table'")
-                ).fetchall()
-                table_names = [row[0] for row in result]
-                print(f"DEBUG: Tables in sync database: {table_names}")
-
-        print(f"DEBUG: Sync engine tables created successfully")
-    else:
-        print("WARNING: sync_engine is None, unable to create sync tables")
-
-    print("DEBUG: Database initialization complete!")
+    print("XXX All tables created in PostgreSQL (Neon)")
+    print("=" * 80 + "\n")
