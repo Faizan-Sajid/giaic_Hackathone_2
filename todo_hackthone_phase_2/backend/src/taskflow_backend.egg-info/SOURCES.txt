@@ -1,6 +1,12 @@
 README.md
 pyproject.toml
+src/agents/__init__.py
+src/agents/agent.py
+src/agents/config.py
+src/agents/initialize.py
+src/agents/prompts.py
 src/api/__init__.py
+src/api/chat.py
 src/api/deps.py
 src/api/routes/auth.py
 src/api/routes/health.py
@@ -11,6 +17,13 @@ src/core/database.py
 src/core/exceptions.py
 src/core/logging.py
 src/core/security.py
+src/database/__init__.py
+src/database/models.py
+src/database/session.py
+src/mcp/__init__.py
+src/mcp/server.py
+src/mcp/tools/__init__.py
+src/mcp/tools/todo.py
 src/models/__init__.py
 src/models/task.py
 src/models/user.py

@@ -31,7 +31,9 @@ class Task(SQLModel, table=True):
     )
     owner_user_id: str = Field(
         foreign_key="user.id",
-        description="Task owner (user UUID) - enforces isolation"
+        description="Task owner (user UUID) - enforces isolation",
+        nullable=False,
+        index=True
     )
     title: str = Field(
         min_length=1,

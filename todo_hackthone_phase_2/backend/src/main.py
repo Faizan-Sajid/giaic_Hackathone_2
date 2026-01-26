@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
-from .core.database import get_session, init_db, engine
+from .database.session import get_session, init_db, engine
 from .core.config import setup_cors
 from .core.exceptions import register_error_handlers
 from .core.logging import get_correlation_id, log_request
@@ -21,11 +21,13 @@ from .core.security import verify_jwt, create_jwt, hash_password, verify_passwor
 
 # Import models to ensure they're registered
 from .models import user, task
+from .database.models import Conversation, Message
 # Import SQLModel to ensure registry is configured
 from sqlmodel import SQLModel
 
 # Import routers
 from .api.routes import auth as auth, tasks as tasks, health as health
+from .api.chat import router as chat
 
 
 # FastAPI application instance
@@ -43,7 +45,7 @@ app = FastAPI(
 # Explicitly configure for frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://giaic-hackathone-2.vercel.app"],  # ONLY allow this origin
+    allow_origins=["https://giaic-hackathone-2.vercel.app","http://localhost:3000"],  # ONLY allow this origin
     allow_credentials=True,  # Required for cookies - set BEFORE other middleware
     allow_methods=["*"],
     allow_headers=["*"],
@@ -107,7 +109,34 @@ async def shutdown_event():
 # /api routes
 app.include_router(auth.router, prefix="/api", tags=["Authentication"])
 app.include_router(tasks.router, prefix="/api", tags=["Tasks"])
+app.include_router(chat, prefix="/api", tags=["Chat"])
 app.include_router(health.router, tags=["Health Check"])
+
+
+# Debug endpoint to check database tables
+@app.get("/debug/tables")
+async def debug_tables():
+    """
+    Debug endpoint to check database tables
+    """
+    from sqlmodel import SQLModel
+    from .database.session import async_engine
+
+    async with async_engine.begin() as conn:
+        # Check what tables exist
+        result = await conn.run_sync(
+            lambda sync_conn: sync_conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall()
+        )
+
+    tables = [row[0] for row in result]
+
+    return {
+        "tables_in_database": tables,
+        "tables_in_metadata": list(SQLModel.metadata.tables.keys()),
+        "expected_tables": ["task", "user", "conversation", "message"]  # Your expected tables
+    }
 
 
 # Root endpoint
