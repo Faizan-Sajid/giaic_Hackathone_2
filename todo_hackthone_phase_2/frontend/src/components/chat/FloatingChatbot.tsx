@@ -32,6 +32,8 @@ export default function FloatingChatbot() {
 
   // Handle resizing
   useEffect(() => {
+    if (typeof window === 'undefined') return; // Guard for SSR
+
     const handleMouseMove = (e: MouseEvent) => {
       if (!isResizing || !containerRef.current) return;
 

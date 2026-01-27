@@ -137,11 +137,14 @@ export default function TaskList({ onEdit, onRefresh }: TaskListProps) {
    * Spec: FR-014 (delete task by ID)
    */
   async function handleDelete(task: Task) {
-    const confirmed = window.confirm(
-      'Are you sure you want to delete this task?'
-    )
+    // Check if window is available (client-side only)
+    if (typeof window !== 'undefined') {
+      const confirmed = window.confirm(
+        'Are you sure you want to delete this task?'
+      )
 
-    if (!confirmed) return
+      if (!confirmed) return
+    }
 
     setIsLoading(true)
     setError(null)

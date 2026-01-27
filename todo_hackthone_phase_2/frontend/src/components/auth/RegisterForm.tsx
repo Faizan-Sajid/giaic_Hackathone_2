@@ -125,7 +125,9 @@ export default function RegisterForm() {
         // Add small delay to allow browser to settle the cookie
         setTimeout(() => {
           // Redirect to dashboard instead of login page
-          window.location.assign('/dashboard'); // Force a hard browser refresh
+          if (typeof window !== 'undefined') {
+            window.location.assign('/dashboard'); // Force a hard browser refresh
+          }
         }, 300);
       } else {
         console.error('Registration response data is missing');

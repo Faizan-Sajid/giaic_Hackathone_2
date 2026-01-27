@@ -60,14 +60,15 @@ def get_cors_origins() -> list[str]:
     NEVER uses wildcard (*) - security requirement
     """
     frontend_url = settings.frontend_url
-    # For local development, also allow 127.0.0.1:3000
+    # Start with the configured frontend URL
     origins = [frontend_url]
 
-    # Add alternative origin for local development if not already present
-    if frontend_url == "http://localhost:3000":
-        origins.append("http://127.0.0.1:3000")
-    elif frontend_url == "http://127.0.0.1:3000":
+    # Always allow localhost for development regardless of production setting
+    if frontend_url != "http://localhost:3000":
         origins.append("http://localhost:3000")
+
+    if frontend_url != "http://127.0.0.1:3000":
+        origins.append("http://127.0.0.1:3000")
 
     return origins
 

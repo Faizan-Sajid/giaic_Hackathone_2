@@ -43,10 +43,20 @@ app = FastAPI(
 )
 
 # Apply CORS middleware FIRST to ensure credentials are allowed
-# Explicitly configure for frontend
+# Explicitly configure for frontend - use environment variable for production URL
+frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+allowed_origins = [frontend_url]
+
+# Always allow localhost for development
+if frontend_url != "http://localhost:3000":
+    allowed_origins.append("http://localhost:3000")
+    allowed_origins.append("http://127.0.0.1:3000")
+else:
+    allowed_origins.append("http://127.0.0.1:3000")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://giaic-hackathone-2.vercel.app","http://localhost:3000"],  # ONLY allow this origin
+    allow_origins=allowed_origins,  # Use environment variable for production
     allow_credentials=True,  # Required for cookies - set BEFORE other middleware
     allow_methods=["*"],
     allow_headers=["*"],

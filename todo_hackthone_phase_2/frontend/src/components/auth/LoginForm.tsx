@@ -113,7 +113,9 @@ export default function LoginForm() {
         // Add small delay to allow browser to settle the cookie
         setTimeout(() => {
           // Use window.location.assign('/dashboard') instead of router.push
-          window.location.assign('/dashboard'); // Force a hard browser refresh
+          if (typeof window !== 'undefined') {
+            window.location.assign('/dashboard'); // Force a hard browser refresh
+          }
         }, 300);
       } else {
         console.error('Login response data is missing required fields');
