@@ -144,8 +144,7 @@ function handleApiError(
  * Generic GET request
  */
 async function get<T>(
-  endpoint: string,
-  userId?: string
+  endpoint: string
 ): Promise<ApiResponse<T>> {
   const correlationId = generateCorrelationId();
   const url = `${API_BASE_URL}${endpoint}`;
@@ -198,8 +197,7 @@ async function get<T>(
  */
 async function post<T>(
   endpoint: string,
-  body: any,
-  userId?: string
+  body: any
 ): Promise<ApiResponse<T>> {
   const correlationId = generateCorrelationId();
   const url = `${API_BASE_URL}${endpoint}`;
@@ -244,8 +242,7 @@ async function post<T>(
  */
 async function put<T>(
   endpoint: string,
-  body: any,
-  userId?: string
+  body: any
 ): Promise<ApiResponse<T>> {
   const correlationId = generateCorrelationId();
   const url = `${API_BASE_URL}${endpoint}`;
@@ -289,8 +286,7 @@ async function put<T>(
  * Generic DELETE request
  */
 async function del<T>(
-  endpoint: string,
-  userId?: string
+  endpoint: string
 ): Promise<ApiResponse<T>> {
   const correlationId = generateCorrelationId();
   const url = `${API_BASE_URL}${endpoint}`;
@@ -333,8 +329,7 @@ async function del<T>(
  */
 async function patch<T>(
   endpoint: string,
-  body?: any,
-  userId?: string
+  body?: any
 ): Promise<ApiResponse<T>> {
   const correlationId = generateCorrelationId();
   const url = `${API_BASE_URL}${endpoint}`;

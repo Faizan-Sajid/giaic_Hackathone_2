@@ -9,7 +9,7 @@ import { useAuth } from '../../../contexts/AuthContext';
  * Spec: Implements Custom Resizable Floating Chatbot that connects to the chat API
  */
 export default function ChatPage() {
-  const { user, isLoading } = useAuth();
+  const { isLoading } = useAuth();
 
   if (isLoading) {
     return (

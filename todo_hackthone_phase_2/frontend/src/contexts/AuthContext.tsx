@@ -130,7 +130,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Always set loading to true when starting the session load
       setSession(prev => ({ ...prev, isLoading: true }));
 
-      const response = await get('/api/auth/session');
+      // Create a timeout promise to prevent hanging requests
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Session load timeout')), 10000); // 10 second timeout
+      });
+
+      // Race the API call against the timeout
+      const responsePromise = get('/api/auth/session');
+
+      const response = await Promise.race([responsePromise, timeoutPromise]) as any;
+
       console.log('SESSION DATA:', response);
 
       if (response.data) {
@@ -183,29 +192,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           logout: logoutUser
         });
         return { user: null, authenticated: false };
+      } else if (error instanceof TypeError && error.message.includes('fetch')) {
+        // This is likely a network error - atomic state update
+        console.log('Network error during session load, setting as not authenticated');
+        setSession({
+          user: null,
+          isLoading: false,
+          refresh: refreshSession,
+          logout: logoutUser
+        });
+      } else if (error.message === 'Session load timeout') {
+        // Handle timeout - atomic state update
+        console.log('Session load timed out, setting as not authenticated');
+        setSession({
+          user: null,
+          isLoading: false,
+          refresh: refreshSession,
+          logout: logoutUser
+        });
       } else {
-        // For network errors and other issues, still set user: null but log appropriately
-        if (error instanceof TypeError && error.message.includes('fetch')) {
-          // This is likely a network error - atomic state update
-          setSession({
-            user: null,
-            isLoading: false,
-            refresh: refreshSession,
-            logout: logoutUser
-          });
-        } else {
-          console.error('Failed to load session:', error);
-          // Atomic state update: user and isLoading: false in the same call
-          setSession(prev => ({
-            ...prev,
-            user: null,
-            isLoading: false,
-            refresh: refreshSession,
-            logout: logoutUser
-          }));
-        }
-        return { user: null, authenticated: false };
+        console.error('Failed to load session:', error);
+        // Atomic state update: user and isLoading: false in the same call
+        setSession(prev => ({
+          ...prev,
+          user: null,
+          isLoading: false,
+          refresh: refreshSession,
+          logout: logoutUser
+        }));
       }
+      return { user: null, authenticated: false };
     }
   }
 

@@ -15,7 +15,7 @@ export default function FloatingChatbot() {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [isSending, setIsSending] = useState(false);
   const [conversationId, setConversationId] = useState<number | null>(null);
   const [dimensions, setDimensions] = useState({ width: 380, height: 500 });
   const [isResizing, setIsResizing] = useState(false);
@@ -63,9 +63,22 @@ export default function FloatingChatbot() {
     };
   }, [isResizing]);
 
+  // Show loading state while authentication is loading
+  if (authLoading) {
+    return (
+      <button
+        className="fixed bottom-6 right-6 z-50 bg-gradient-to-tr from-indigo-600 to-violet-500 text-white p-4 rounded-full shadow-lg hover:shadow-xl hover:from-indigo-700 hover:to-violet-600 transition-all duration-300 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 animate-pulse opacity-50"
+        aria-label="AI Chatbot loading"
+        disabled
+      >
+        <MessageCircle size={24} />
+      </button>
+    );
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputMessage.trim() || isLoading || !user) return;
+    if (!inputMessage.trim() || isSending || !user) return;
 
     // Add user message to UI immediately
     const userMessage = {
@@ -77,7 +90,7 @@ export default function FloatingChatbot() {
     setMessages(prev => [...prev, userMessage]);
     const currentInput = inputMessage;
     setInputMessage('');
-    setIsLoading(true);
+    setIsSending(true);
 
     try {
       // Call our backend API using the standard client which handles cookies properly
@@ -148,7 +161,7 @@ export default function FloatingChatbot() {
 
       setMessages(prev => [...prev, errorMessage]);
     } finally {
-      setIsLoading(false);
+      setIsSending(false);
     }
   };
 
@@ -265,7 +278,7 @@ export default function FloatingChatbot() {
                   </div>
                 ))
               )}
-              {isLoading && (
+              {isSending && (
                 <div className="flex justify-start">
                   <div className="bg-gray-100/80 text-gray-800 rounded-2xl rounded-tl-none p-3 max-w-[85%]">
                     <div className="flex items-center space-x-1">
@@ -288,11 +301,11 @@ export default function FloatingChatbot() {
                   onChange={(e) => setInputMessage(e.target.value)}
                   placeholder="Type your message..."
                   className="flex-1 border border-gray-300 rounded-l-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white/80"
-                  disabled={isLoading}
+                  disabled={isSending}
                 />
                 <button
                   type="submit"
-                  disabled={isLoading || !inputMessage.trim()}
+                  disabled={isSending || !inputMessage.trim()}
                   className="bg-indigo-500 text-white px-4 rounded-r-lg disabled:opacity-50 text-sm hover:bg-indigo-600 transition-colors"
                 >
                   Send

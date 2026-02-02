@@ -6,7 +6,6 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { post, ApiError, HttpStatus, User } from '../../lib/api/client'
 import { useAuth } from '../../contexts/AuthContext'
 
@@ -29,7 +28,6 @@ import { useAuth } from '../../contexts/AuthContext'
  * - NEVER stores JWT in localStorage
  */
 export default function RegisterForm() {
-  const router = useRouter()
   const { login } = useAuth()
   const [formData, setFormData] = useState({
     email: '',

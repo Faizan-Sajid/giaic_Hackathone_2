@@ -7,7 +7,7 @@
 
 import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { get, patch, delete as deleteReq, ApiError, HttpStatus } from '../lib/api/client'
+import { get, patch, delete as deleteReq, ApiError } from '../lib/api/client'
 
 
 /**
@@ -232,7 +232,7 @@ export default function TaskList({ onEdit, onRefresh }: TaskListProps) {
           <h3 className="mt-2 text-sm font-medium text-gray-900">Error</h3>
           <p className="mt-1 text-sm text-gray-500">{error}</p>
           <button
-            onClick={loadTasks}
+            onClick={() => loadTasks(true)}
             className="mt-4 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
           >
             Retry

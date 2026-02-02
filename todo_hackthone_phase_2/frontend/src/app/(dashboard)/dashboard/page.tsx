@@ -39,10 +39,9 @@ interface Task {
  * - NEVER stores JWT in localStorage
  */
 export default function DashboardPage() {
-  console.log('DASHBOARD PAGE IS RENDERING');
   const { user, logout } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false); // Start with false, then set to true when fetching
 
   // Calculate stats dynamically
   const totalTasks = tasks.length;
@@ -53,10 +52,11 @@ export default function DashboardPage() {
    * Fetch tasks from the API
    */
   const fetchTasks = async (showLoading = false) => {
+    if (showLoading) {
+      setIsLoading(true);
+    }
+
     if (user) {
-      if (showLoading) {
-        setIsLoading(true);
-      }
       try {
         const response = await get(`/api/${user.id}/tasks`);
         if (response.data) {
@@ -69,19 +69,34 @@ export default function DashboardPage() {
           setIsLoading(false);
         }
       }
+    } else {
+      // If no user, ensure loading state is reset
+      if (showLoading) {
+        setIsLoading(false);
+      }
     }
   };
 
   useEffect(() => {
-    // Initial fetch with loading state
-    fetchTasks(true);
+    console.log('Dashboard - User changed:', user);
+
+    if (user) {
+      // Initial fetch with loading state when user is available
+      fetchTasks(true);
+    }
 
     // Set up polling to refresh tasks every 5 seconds
-    const intervalId = setInterval(() => fetchTasks(), 5000);
+    const intervalId = setInterval(() => {
+      if (user) {
+        fetchTasks(); // Only fetch if user is available
+      }
+    }, 5000);
 
     // Listen for task update events from chatbot
     const handleTaskUpdate = () => {
-      fetchTasks(); // Refresh immediately when tasks are updated via chatbot
+      if (user) {
+        fetchTasks(); // Refresh only if user is available
+      }
     };
 
     window.addEventListener('tasksUpdated', handleTaskUpdate);
@@ -92,6 +107,11 @@ export default function DashboardPage() {
       window.removeEventListener('tasksUpdated', handleTaskUpdate);
     };
   }, [user]);
+
+  // Additional effect to handle initial loading state when user changes
+  useEffect(() => {
+    console.log('Dashboard - Loading status:', isLoading);
+  }, [isLoading]);
 
   /**
    * Handle logout
@@ -173,7 +193,11 @@ export default function DashboardPage() {
                 </div>
                 <div className="ml-4">
                   <p className="text-sm font-medium text-zinc-400">Total Tasks</p>
-                  <p className="text-2xl font-bold text-white">{totalTasks}</p>
+                  {isLoading ? (
+                    <div className="h-8 w-16 bg-zinc-700 rounded animate-pulse"></div>
+                  ) : (
+                    <p className="text-2xl font-bold text-white">{totalTasks}</p>
+                  )}
                 </div>
               </div>
             </div>
@@ -187,7 +211,11 @@ export default function DashboardPage() {
                 </div>
                 <div className="ml-4">
                   <p className="text-sm font-medium text-zinc-400">Completed</p>
-                  <p className="text-2xl font-bold text-white">{completedTasks}</p>
+                  {isLoading ? (
+                    <div className="h-8 w-16 bg-zinc-700 rounded animate-pulse"></div>
+                  ) : (
+                    <p className="text-2xl font-bold text-white">{completedTasks}</p>
+                  )}
                 </div>
               </div>
             </div>
@@ -201,7 +229,11 @@ export default function DashboardPage() {
                 </div>
                 <div className="ml-4">
                   <p className="text-sm font-medium text-zinc-400">Pending</p>
-                  <p className="text-2xl font-bold text-white">{pendingTasks}</p>
+                  {isLoading ? (
+                    <div className="h-8 w-16 bg-zinc-700 rounded animate-pulse"></div>
+                  ) : (
+                    <p className="text-2xl font-bold text-white">{pendingTasks}</p>
+                  )}
                 </div>
               </div>
             </div>
