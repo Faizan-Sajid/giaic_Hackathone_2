@@ -52,25 +52,45 @@ export default function DashboardPage() {
   /**
    * Fetch tasks from the API
    */
-  useEffect(() => {
-    const fetchTasks = async () => {
-      if (user) {
-        try {
-          const response = await get(`/api/${user.id}/tasks`);
-          if (response.data) {
-            setTasks(response.data as Task[]);
-          }
-        } catch (error) {
-          console.error('Failed to fetch tasks:', error);
-        } finally {
+  const fetchTasks = async (showLoading = false) => {
+    if (user) {
+      if (showLoading) {
+        setIsLoading(true);
+      }
+      try {
+        const response = await get(`/api/${user.id}/tasks`);
+        if (response.data) {
+          setTasks(response.data as Task[]);
+        }
+      } catch (error) {
+        console.error('Failed to fetch tasks:', error);
+      } finally {
+        if (showLoading) {
           setIsLoading(false);
         }
-      } else {
-        setIsLoading(false);
       }
+    }
+  };
+
+  useEffect(() => {
+    // Initial fetch with loading state
+    fetchTasks(true);
+
+    // Set up polling to refresh tasks every 5 seconds
+    const intervalId = setInterval(() => fetchTasks(), 5000);
+
+    // Listen for task update events from chatbot
+    const handleTaskUpdate = () => {
+      fetchTasks(); // Refresh immediately when tasks are updated via chatbot
     };
 
-    fetchTasks();
+    window.addEventListener('tasksUpdated', handleTaskUpdate);
+
+    // Clean up interval and event listener on component unmount
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener('tasksUpdated', handleTaskUpdate);
+    };
   }, [user]);
 
   /**

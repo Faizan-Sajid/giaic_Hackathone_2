@@ -60,23 +60,18 @@ export default function TaskList({ onEdit, onRefresh }: TaskListProps) {
   const [error, setError] = useState<string | null>(null)
 
   /**
-   * Load tasks on mount or when user changes
-   */
-  useEffect(() => {
-    loadTasks()
-  }, [user])
-
-  /**
    * Load tasks from API
    *
    * Task: T041
    * Spec: FR-011 (list user's own tasks)
    */
-  async function loadTasks() {
+  async function loadTasks(showLoading = false) {
     if (!user) return
 
-    setIsLoading(true)
-    setError(null)
+    if (showLoading) {
+      setIsLoading(true)
+      setError(null)
+    }
 
     try {
       const response = await get(`/api/${user.id}/tasks`)
@@ -85,15 +80,43 @@ export default function TaskList({ onEdit, onRefresh }: TaskListProps) {
         setTasks(response.data as Task[])
       }
     } catch (error) {
-      if (error instanceof ApiError) {
-        setError('Failed to load tasks. Please try again.')
-      } else {
-        setError('Network error. Please check your connection.')
+      if (showLoading) {
+        if (error instanceof ApiError) {
+          setError('Failed to load tasks. Please try again.')
+        } else {
+          setError('Network error. Please check your connection.')
+        }
       }
     } finally {
-      setIsLoading(false)
+      if (showLoading) {
+        setIsLoading(false)
+      }
     }
   }
+
+  /**
+   * Load tasks on mount or when user changes with polling
+   */
+  useEffect(() => {
+    // Initial load with loading state
+    loadTasks(true)
+
+    // Set up polling to refresh tasks every 5 seconds
+    const intervalId = setInterval(() => loadTasks(), 5000)
+
+    // Listen for task update events from chatbot
+    const handleTaskUpdate = () => {
+      loadTasks(); // Refresh immediately when tasks are updated via chatbot
+    };
+
+    window.addEventListener('tasksUpdated', handleTaskUpdate);
+
+    // Clean up interval and event listener on component unmount
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener('tasksUpdated', handleTaskUpdate);
+    }
+  }, [user])
 
   /**
    * Toggle task completion
@@ -119,6 +142,9 @@ export default function TaskList({ onEdit, onRefresh }: TaskListProps) {
       if (onRefresh) {
         onRefresh()
       }
+
+      // Dispatch a custom event to notify other components of task changes
+      window.dispatchEvent(new CustomEvent('tasksUpdated'));
     } catch (error) {
       if (error instanceof ApiError) {
         setError('Failed to update task. Please try again.')
@@ -159,6 +185,9 @@ export default function TaskList({ onEdit, onRefresh }: TaskListProps) {
       if (onRefresh) {
         onRefresh()
       }
+
+      // Dispatch a custom event to notify other components of task changes
+      window.dispatchEvent(new CustomEvent('tasksUpdated'));
     } catch (error) {
       if (error instanceof ApiError) {
         setError('Failed to delete task. Please try again.')

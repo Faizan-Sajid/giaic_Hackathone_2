@@ -131,7 +131,9 @@ export default function TaskForm({ task, onSubmit, onCancel }: TaskFormProps) {
         })
 
         if (response.data) {
-          onSubmit()
+          onSubmit();
+          // Dispatch a custom event to notify other components of task changes
+          window.dispatchEvent(new CustomEvent('tasksUpdated'));
         }
       } else {
         // Create new task (T043)
@@ -143,7 +145,9 @@ export default function TaskForm({ task, onSubmit, onCancel }: TaskFormProps) {
         if (response.data) {
           // Clear form data
           setFormData({ title: '', description: '' })
-          onSubmit()
+          onSubmit();
+          // Dispatch a custom event to notify other components of task changes
+          window.dispatchEvent(new CustomEvent('tasksUpdated'));
         }
       }
     } catch (error) {

@@ -127,9 +127,13 @@ export default function FloatingChatbot() {
         // Log tool calls for debugging
         console.log('Tool calls received:', data.tool_calls);
 
-        // Remove the tool processing message after a short delay
+        // Dispatch a custom event to notify other components of task changes
         setTimeout(() => {
+          // Remove the tool processing message after a short delay
           setMessages(prev => prev.filter(msg => msg.id !== toolProcessingMessage.id));
+
+          // Dispatch a custom event to notify other components of task changes
+          window.dispatchEvent(new CustomEvent('tasksUpdated'));
         }, 2000);
       }
     } catch (error) {
