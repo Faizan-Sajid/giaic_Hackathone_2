@@ -201,7 +201,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           refresh: refreshSession,
           logout: logoutUser
         });
-      } else if (error.message === 'Session load timeout') {
+      } else if (error instanceof Error && error.message === 'Session load timeout') {
         // Handle timeout - atomic state update
         console.log('Session load timed out, setting as not authenticated');
         setSession({
