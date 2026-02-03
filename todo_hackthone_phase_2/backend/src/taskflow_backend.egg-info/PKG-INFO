@@ -24,3 +24,4 @@ Requires-Dist: pydantic-ai>=0.0.7
 Requires-Dist: openai-agents>=0.1.0
 Requires-Dist: psycopg2>=2.9.11
 Requires-Dist: aiosqlite>=0.22.1
+Requires-Dist: pg8000>=1.31.5

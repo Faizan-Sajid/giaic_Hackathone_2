@@ -16,6 +16,10 @@ load_dotenv()
 # Database URL from environment variable
 DATABASE_URL = os.getenv("DATABASE_URL")
 
+# Process DATABASE_URL for async operations (asyncpg)
+# Convert standard PostgreSQL URLs to asyncpg format
+ASYNC_DB_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://").replace("sslmode=require", "ssl=require")
+
 # Connection pool configuration from plan.md R-004
 # pool_size=10: Maintain 10 connections in pool
 # max_overflow=10: Allow 10 additional connections when pool exhausted
@@ -23,7 +27,7 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 # pool_recycle=3600: Recycle connections after 1 hour (prevent connection rot)
 
 engine = create_async_engine(
-    DATABASE_URL,
+    ASYNC_DB_URL,
     echo=False,  # Disable SQL logging in production (security requirement)
     pool_size=int(os.getenv("DB_POOL_SIZE", "10")),
     max_overflow=int(os.getenv("DB_MAX_OVERFLOW", "10")),
@@ -63,3 +67,5 @@ async def init_db():
     # This will also configure the registry
     async with engine.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
+
+    print(f"XXX Database initialized with URL: {engine.url}")

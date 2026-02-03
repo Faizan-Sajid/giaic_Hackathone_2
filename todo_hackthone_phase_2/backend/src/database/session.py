@@ -15,10 +15,10 @@ load_dotenv()
 # Database URL from environment variable
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-print("=" * 80)
-print("DATABASE INITIALIZATION DEBUG")
-print("=" * 80)
-print(f"DATABASE_URL from env: {DATABASE_URL}")
+# print("=" * 80)
+# print("DATABASE INITIALIZATION DEBUG")
+# print("=" * 80)
+# print(f"DATABASE_URL from env: {DATABASE_URL}")
 
 # CRITICAL FIX: Use ONLY PostgreSQL, no fallback to SQLite
 if not DATABASE_URL or "postgresql" not in DATABASE_URL:
@@ -32,11 +32,14 @@ if not DATABASE_URL or "postgresql" not in DATABASE_URL:
 # For Async (asyncpg) - asyncpg uses ssl=require in URL, not sslmode
 ASYNC_DB_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://").replace("sslmode=require", "ssl=require")
 
-# For Sync (psycopg2) - sync engine uses psycopg2 which expects sslmode=require
-SYNC_DB_URL = DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://")
-if "ssl=" in SYNC_DB_URL and "sslmode=" not in SYNC_DB_URL:
-    # Convert ssl= to sslmode= for psycopg2
-    SYNC_DB_URL = SYNC_DB_URL.replace("ssl=require", "sslmode=require").replace("ssl=true", "sslmode=require")
+# For Sync (pg8000) - sync engine uses pg8000 which handles SSL differently
+SYNC_DB_URL = DATABASE_URL.replace("postgresql+asyncpg://", "postgresql+pg8000://")
+# Remove both sslmode and ssl parameters as pg8000 doesn't accept them
+SYNC_DB_URL = SYNC_DB_URL.replace("sslmode=require", "").replace("sslmode=yes", "").replace("ssl=true", "").replace("ssl=require", "")
+# Clean up any double ampersands or trailing separators that might occur after removal
+SYNC_DB_URL = SYNC_DB_URL.replace("??", "?").replace("&&", "&").replace("?&", "?").replace("&&", "&")
+if SYNC_DB_URL.endswith("?") or SYNC_DB_URL.endswith("&"):
+    SYNC_DB_URL = SYNC_DB_URL[:-1]
 
 # Ensure both URLs have proper SSL configuration for Neon
 if "ssl=require" not in ASYNC_DB_URL and "sslmode=require" not in ASYNC_DB_URL:
@@ -46,12 +49,8 @@ if "ssl=require" not in ASYNC_DB_URL and "sslmode=require" not in ASYNC_DB_URL:
     else:
         ASYNC_DB_URL = f"{ASYNC_DB_URL}?ssl=require"
 
-if "sslmode=require" not in SYNC_DB_URL and "ssl=require" not in SYNC_DB_URL:
-    # Add sslmode=require to sync URL
-    if "?" in SYNC_DB_URL:
-        SYNC_DB_URL = f"{SYNC_DB_URL}&sslmode=require"
-    else:
-        SYNC_DB_URL = f"{SYNC_DB_URL}?sslmode=require"
+# For pg8000, we don't add SSL parameters to the URL as it handles SSL differently
+# SSL will be handled by the underlying connection mechanism
 
 # Connection pool configuration
 # pool_size=10: Maintain 10 connections in pool
@@ -75,7 +74,7 @@ print(f"   Engine Type: PostgreSQL (asyncpg)")
 print(f"   This will be used for: Chatbot tools, Async operations")
 
 # Create PostgreSQL sync engine (for sync operations like MCP tools) - NO FALLBACK!
-# psycopg2 handles SSL via sslmode parameter
+# pg8000 handles SSL via connect_args
 sync_engine = create_engine(
     SYNC_DB_URL,
     echo=True,
@@ -86,7 +85,7 @@ sync_engine = create_engine(
 )
 
 print(f"XXX Sync Engine Created: {sync_engine.url}")
-print(f"   Engine Type: PostgreSQL (psycopg2/other)")
+print(f"   Engine Type: PostgreSQL (pg8000)")
 print(f"   This will be used for: MCP tools, Sync operations")
 print("=" * 80)
 
@@ -137,14 +136,20 @@ def get_session_sync() -> Generator[Session, None, None]:
     # Debug: Log which database we're connected to
     db_name = sync_engine.url.database
     db_host = sync_engine.url.host
-    print(f"[CONNECTION] Sync Session created: Connected to {db_host}/{db_name} (PostgreSQL)")
+    print(f"[CONNECTION] Sync Session created: Connected to {db_host}/{db_name} (PostgreSQL) with pg8000 driver")
 
-    session = Session(sync_engine)
     try:
+        session = Session(sync_engine)
         yield session
+    except Exception as e:
+        print(f"[CONNECTION] Error creating sync session: {e}")
+        raise
     finally:
-        session.close()
-        print(f"[CONNECTION] Sync Session closed: {db_host}/{db_name}")
+        try:
+            session.close()
+            print(f"[CONNECTION] Sync Session closed: {db_host}/{db_name}")
+        except Exception as e:
+            print(f"[CONNECTION] Error closing sync session: {e}")
 
 
 async def init_db():

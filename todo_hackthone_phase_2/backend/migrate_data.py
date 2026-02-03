@@ -15,20 +15,14 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 
 # Process the DATABASE_URL for sync compatibility
 sync_database_url = DATABASE_URL
-if DATABASE_URL.startswith("postgresql://"):
-    # Handle SSL parameter issues in PostgreSQL URLs
-    if "?ssl=require" in DATABASE_URL or "&ssl=require" in DATABASE_URL:
-        sync_database_url = DATABASE_URL.replace("?ssl=require", "?sslmode=require").replace("&ssl=require", "&sslmode=require")
-    elif "?ssl=true" in DATABASE_URL or "&ssl=true" in DATABASE_URL:
-        sync_database_url = DATABASE_URL.replace("?ssl=true", "?sslmode=require").replace("&ssl=true", "&sslmode=require")
-    elif "sslmode=require" not in DATABASE_URL:
-        if "?" in DATABASE_URL:
-            sync_database_url = f"{DATABASE_URL}&sslmode=require"
-        else:
-            sync_database_url = f"{DATABASE_URL}?sslmode=require"
-
-# Ensure we use the psycopg2 compatible URL (not asyncpg)
-sync_database_url = sync_database_url.replace("postgresql+asyncpg://", "postgresql://")
+# Ensure we use the pg8000 compatible URL (not asyncpg)
+sync_database_url = sync_database_url.replace("postgresql+asyncpg://", "postgresql+pg8000://")
+# Remove both sslmode and ssl parameters as pg8000 doesn't support them
+sync_database_url = sync_database_url.replace("sslmode=require", "").replace("sslmode=yes", "").replace("ssl=true", "").replace("ssl=require", "")
+# Clean up any double ampersands or trailing separators that might occur after removal
+sync_database_url = sync_database_url.replace("??", "?").replace("&&", "&").replace("?&", "?").replace("&&", "&")
+if sync_database_url.endswith("?") or sync_database_url.endswith("&"):
+    sync_database_url = sync_database_url[:-1]
 
 def migrate_sqlite_to_postgres():
     """Migrate tasks from SQLite to PostgreSQL"""
